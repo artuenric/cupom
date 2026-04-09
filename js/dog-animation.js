@@ -2,7 +2,7 @@
   Logica isolada do cachorro:
   - mapa de sprites
   - configuracao de tempos
-  - timeline automatica
+  - fluxo automatico aleatorio
   - fila manual com prioridade para eat
 */
 
@@ -22,277 +22,330 @@
 
   const DOG_ANIMATION_CONFIG = {
     frameDelay: 500,
+    defaultDelay: 500,
+    tongueDelay: 1000,
     eatFrameDelay: 1000,
-    idleHoldFrames: 3,
-    sequenceGapFrames: 1,
     debugMode: false
   };
 
-  const DOG_AUTO_TIMELINE = [
-    "idle",
-    "idle",
-    "tail",
-    "idle",
-    "opa",
-    "idle",
-    "tongue",
-    "idle",
-    "idle",
-    "stand",
-    "idle",
-    "idle",
-    "idle"
-  ];
+  const DOG_AUTO_STEPS = ["default", "tail", "opa", "tongue", "stand"];
 
   class DogAnimator {
-  constructor(spriteElement, sprites, config, autoTimeline) {
-    this.spriteElement = spriteElement;
-    this.sprites = sprites;
-    this.config = config;
-    this.autoTimeline = autoTimeline;
+    constructor(spriteElement, sprites, config, autoSteps) {
+      this.spriteElement = spriteElement;
+      this.sprites = sprites;
+      this.config = config;
+      this.autoSteps = autoSteps;
 
-    this.running = false;
-    this.currentState = "default";
-    this.autoIndex = 0;
-    this.manualQueue = [];
-    this.listeners = new Map();
-  }
-
-  on(eventName, listener) {
-    const listeners = this.listeners.get(eventName) ?? [];
-    listeners.push(listener);
-    this.listeners.set(eventName, listeners);
-
-    return () => this.off(eventName, listener);
-  }
-
-  off(eventName, listener) {
-    const listeners = this.listeners.get(eventName);
-
-    if (!listeners) {
-      return;
+      this.running = false;
+      this.currentState = "default";
+      this.manualQueue = [];
+      this.listeners = new Map();
+      this.lastAutoStep = null;
+      this.nextAutoStepOverride = null;
+      this.activeSequenceName = null;
+      this.activeTimeoutId = null;
+      this.activeTimeoutResolve = null;
+      this.interruptVersion = 0;
     }
 
-    this.listeners.set(
-      eventName,
-      listeners.filter((registeredListener) => registeredListener !== listener)
-    );
-  }
+    on(eventName, listener) {
+      const listeners = this.listeners.get(eventName) ?? [];
+      listeners.push(listener);
+      this.listeners.set(eventName, listeners);
 
-  emit(eventName, payload = {}) {
-    const listeners = this.listeners.get(eventName) ?? [];
-
-    listeners.forEach((listener) => {
-      listener(payload);
-    });
-  }
-
-  preloadAll() {
-    Object.values(this.sprites).forEach((src) => {
-      const image = new Image();
-      image.src = src;
-    });
-  }
-
-  setState(stateName) {
-    const src = this.sprites[stateName];
-    if (!src || !this.spriteElement) {
-      return;
+      return () => this.off(eventName, listener);
     }
 
-    this.currentState = stateName;
-    this.spriteElement.src = src;
-  }
+    off(eventName, listener) {
+      const listeners = this.listeners.get(eventName);
 
-  wait(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  async playFrame(stateName, delay = this.config.frameDelay) {
-    this.setState(stateName);
-    await this.wait(delay);
-  }
-
-  async playSequence(frames) {
-    await this.playFrame("default");
-
-    for (const frame of frames) {
-      await this.playFrame(frame);
-    }
-
-    await this.playFrame("default");
-    await this.wait(this.config.frameDelay * this.config.sequenceGapFrames);
-  }
-
-  async playIdle() {
-    this.setState("default");
-    await this.wait(this.config.frameDelay * this.config.idleHoldFrames);
-  }
-
-  async playTail() {
-    await this.playSequence(["tail1", "tail2", "tail1"]);
-  }
-
-  async playStand() {
-    await this.playSequence(["stand1", "stand2", "stand1"]);
-  }
-
-  async playOpa() {
-    await this.playSequence(["opa"]);
-  }
-
-  async playTongue() {
-    await this.playSequence(["tongue"]);
-  }
-
-  async playEat() {
-    await this.playFrame("default");
-    await this.playFrame("eat", this.config.eatFrameDelay);
-    await this.playFrame("default");
-    await this.wait(this.config.frameDelay * this.config.sequenceGapFrames);
-  }
-
-  async playChokeSpit() {
-    await this.playSequence(["choke", "spit"]);
-  }
-
-  async runAutomaticStep() {
-    const step = this.autoTimeline[this.autoIndex % this.autoTimeline.length];
-    this.autoIndex += 1;
-
-    if (step === "tail") {
-      await this.playTail();
-      return;
-    }
-
-    if (step === "opa") {
-      await this.playOpa();
-      return;
-    }
-
-    if (step === "tongue") {
-      await this.playTongue();
-      return;
-    }
-
-    if (step === "stand") {
-      await this.playStand();
-      return;
-    }
-
-    await this.playIdle();
-  }
-
-  enqueueManual(sequenceName, options = {}) {
-    const { priority = false } = options;
-
-    if (sequenceName !== "eat" && sequenceName !== "chokeSpit" && sequenceName !== "stand") {
-      return;
-    }
-
-    if (sequenceName === "eat") {
-      const firstNonEatIndex = this.manualQueue.findIndex((queuedSequence) => queuedSequence !== "eat");
-
-      if (firstNonEatIndex === -1) {
-        this.manualQueue.push(sequenceName);
+      if (!listeners) {
         return;
       }
 
-      this.manualQueue.splice(firstNonEatIndex, 0, sequenceName);
-      return;
+      this.listeners.set(
+        eventName,
+        listeners.filter((registeredListener) => registeredListener !== listener)
+      );
     }
 
-    if (priority) {
-      this.manualQueue.unshift(sequenceName);
-      return;
+    emit(eventName, payload = {}) {
+      const listeners = this.listeners.get(eventName) ?? [];
+
+      listeners.forEach((listener) => {
+        listener(payload);
+      });
     }
 
-    this.manualQueue.push(sequenceName);
-  }
-
-  dequeueNextManual() {
-    const eatIndex = this.manualQueue.indexOf("eat");
-
-    if (eatIndex !== -1) {
-      return this.manualQueue.splice(eatIndex, 1)[0];
+    preloadAll() {
+      Object.values(this.sprites).forEach((src) => {
+        const image = new Image();
+        image.src = src;
+      });
     }
 
-    return this.manualQueue.shift();
-  }
+    setState(stateName) {
+      const src = this.sprites[stateName];
 
-  async runManualSequence(sequenceName) {
-    this.emit("manual-sequence-start", { sequenceName });
-
-    if (sequenceName === "eat") {
-      await this.playEat();
-      this.emit("manual-sequence-end", { sequenceName });
-      return;
-    }
-
-    if (sequenceName === "stand") {
-      await this.playStand();
-      this.emit("manual-sequence-end", { sequenceName });
-      return;
-    }
-
-    if (sequenceName === "chokeSpit") {
-      await this.playChokeSpit();
-      this.emit("manual-sequence-end", { sequenceName });
-    }
-  }
-
-  async start() {
-    if (this.running || !this.spriteElement) {
-      return;
-    }
-
-    this.running = true;
-    this.preloadAll();
-    this.setState("default");
-
-    while (this.running) {
-      if (this.manualQueue.length > 0) {
-        const manualSequence = this.dequeueNextManual();
-        await this.runManualSequence(manualSequence);
-        continue;
+      if (!src || !this.spriteElement) {
+        return;
       }
 
-      await this.runAutomaticStep();
+      this.currentState = stateName;
+      this.spriteElement.src = src;
     }
-  }
 
-  stop() {
-    this.running = false;
-    this.setState("default");
-  }
+    wait(ms, version = this.interruptVersion) {
+      if (version !== this.interruptVersion || !this.running) {
+        return Promise.resolve(false);
+      }
 
-  getStatus() {
-    return {
-      running: this.running,
-      currentState: this.currentState,
-      manualQueue: [...this.manualQueue],
-      nextAutoStep: this.autoTimeline[this.autoIndex % this.autoTimeline.length]
-    };
-  }
+      if (ms <= 0) {
+        return Promise.resolve(true);
+      }
+
+      return new Promise((resolve) => {
+        let settled = false;
+
+        const finalize = (completed) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+
+          if (this.activeTimeoutId === timeoutId) {
+            this.activeTimeoutId = null;
+            this.activeTimeoutResolve = null;
+          }
+
+          resolve(completed);
+        };
+
+        const timeoutId = setTimeout(() => {
+          const finishedWithoutInterruption = version === this.interruptVersion && this.running;
+          finalize(finishedWithoutInterruption);
+        }, ms);
+
+        this.activeTimeoutId = timeoutId;
+        this.activeTimeoutResolve = () => {
+          clearTimeout(timeoutId);
+          finalize(false);
+        };
+      });
+    }
+
+    interruptCurrentStep() {
+      this.interruptVersion += 1;
+
+      if (typeof this.activeTimeoutResolve === "function") {
+        this.activeTimeoutResolve();
+      }
+    }
+
+    async playFrame(stateName, delay = this.config.frameDelay, version = this.interruptVersion) {
+      if (version !== this.interruptVersion || !this.running) {
+        return false;
+      }
+
+      this.setState(stateName);
+      return this.wait(delay, version);
+    }
+
+    async playSequence(frames, delay = this.config.frameDelay, version = this.interruptVersion) {
+      for (const frame of frames) {
+        const completed = await this.playFrame(frame, delay, version);
+
+        if (!completed) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    async playDefault(version = this.interruptVersion) {
+      return this.playFrame("default", this.config.defaultDelay, version);
+    }
+
+    async playTail(version = this.interruptVersion) {
+      return this.playSequence(["tail1", "tail2", "tail1"], this.config.frameDelay, version);
+    }
+
+    async playStand(version = this.interruptVersion) {
+      return this.playSequence(["stand1", "stand2", "stand1", "stand1"], this.config.frameDelay, version);
+    }
+
+    async playOpa(version = this.interruptVersion) {
+      return this.playSequence(["opa", "default", "opa"], this.config.frameDelay, version);
+    }
+
+    async playTongue(version = this.interruptVersion) {
+      return this.playFrame("tongue", this.config.tongueDelay, version);
+    }
+
+    async playEat(version = this.interruptVersion) {
+      return this.playFrame("eat", this.config.eatFrameDelay, version);
+    }
+
+    async playChokeSpit(version = this.interruptVersion) {
+      return this.playSequence(["choke", "spit"], this.config.frameDelay, version);
+    }
+
+    pickNextAutoStep() {
+      if (this.nextAutoStepOverride) {
+        const forcedStep = this.nextAutoStepOverride;
+        this.nextAutoStepOverride = null;
+        this.lastAutoStep = forcedStep;
+        return forcedStep;
+      }
+
+      const nonRepeatedSteps = this.autoSteps.filter((step) => step !== this.lastAutoStep);
+      const availableSteps = nonRepeatedSteps.length > 0 ? nonRepeatedSteps : this.autoSteps;
+      const randomIndex = Math.floor(Math.random() * availableSteps.length);
+      const selectedStep = availableSteps[randomIndex] ?? "default";
+
+      this.lastAutoStep = selectedStep;
+      return selectedStep;
+    }
+
+    async runAutomaticStep(stepName, version = this.interruptVersion) {
+      if (stepName === "tail") {
+        return this.playTail(version);
+      }
+
+      if (stepName === "opa") {
+        return this.playOpa(version);
+      }
+
+      if (stepName === "tongue") {
+        return this.playTongue(version);
+      }
+
+      if (stepName === "stand") {
+        return this.playStand(version);
+      }
+
+      return this.playDefault(version);
+    }
+
+    enqueueManual(sequenceName, options = {}) {
+      const { priority = false, interrupt = false } = options;
+
+      if (sequenceName !== "eat" && sequenceName !== "chokeSpit" && sequenceName !== "stand") {
+        return;
+      }
+
+      if (sequenceName === "eat") {
+        const firstNonEatIndex = this.manualQueue.findIndex((queuedSequence) => queuedSequence !== "eat");
+
+        if (firstNonEatIndex === -1) {
+          this.manualQueue.push(sequenceName);
+        } else {
+          this.manualQueue.splice(firstNonEatIndex, 0, sequenceName);
+        }
+
+        if (this.activeSequenceName !== "eat") {
+          this.interruptCurrentStep();
+        }
+
+        return;
+      }
+
+      if (priority) {
+        this.manualQueue.unshift(sequenceName);
+      } else {
+        this.manualQueue.push(sequenceName);
+      }
+
+      if (interrupt) {
+        this.interruptCurrentStep();
+      }
+    }
+
+    dequeueNextManual() {
+      return this.manualQueue.shift();
+    }
+
+    async runManualSequence(sequenceName, version = this.interruptVersion) {
+      this.emit("manual-sequence-start", { sequenceName });
+
+      let completed = false;
+
+      if (sequenceName === "eat") {
+        completed = await this.playEat(version);
+      } else if (sequenceName === "stand") {
+        completed = await this.playStand(version);
+      } else if (sequenceName === "chokeSpit") {
+        completed = await this.playChokeSpit(version);
+      }
+
+      this.emit("manual-sequence-end", { sequenceName, completed });
+      return completed;
+    }
+
+    async start() {
+      if (this.running || !this.spriteElement) {
+        return;
+      }
+
+      this.running = true;
+      this.preloadAll();
+      this.setState("default");
+
+      while (this.running) {
+        const manualSequence = this.dequeueNextManual();
+
+        if (manualSequence) {
+          const sequenceVersion = this.interruptVersion;
+          this.activeSequenceName = manualSequence;
+          await this.runManualSequence(manualSequence, sequenceVersion);
+          this.activeSequenceName = null;
+          continue;
+        }
+
+        const autoStep = this.pickNextAutoStep();
+        const sequenceVersion = this.interruptVersion;
+        this.activeSequenceName = autoStep;
+        await this.runAutomaticStep(autoStep, sequenceVersion);
+        this.activeSequenceName = null;
+      }
+    }
+
+    stop() {
+      this.running = false;
+      this.interruptCurrentStep();
+      this.activeSequenceName = null;
+      this.setState("default");
+    }
+
+    forceNextAutoStep(stepName) {
+      if (!this.autoSteps.includes(stepName)) {
+        return;
+      }
+
+      this.nextAutoStepOverride = stepName;
+      this.interruptCurrentStep();
+    }
+
+    getStatus() {
+      return {
+        running: this.running,
+        currentState: this.currentState,
+        manualQueue: [...this.manualQueue],
+        activeSequenceName: this.activeSequenceName,
+        nextAutoStep: this.nextAutoStepOverride ?? "random"
+      };
+    }
   }
 
   function createDogAnimation(spriteElement) {
-    const animator = new DogAnimator(
-      spriteElement,
-      DOG_SPRITES,
-      DOG_ANIMATION_CONFIG,
-      DOG_AUTO_TIMELINE
-    );
+    const animator = new DogAnimator(spriteElement, DOG_SPRITES, DOG_ANIMATION_CONFIG, DOG_AUTO_STEPS);
 
     return {
       animator,
-      config: DOG_ANIMATION_CONFIG,
-      timelineIndexes: {
-        tail: 2,
-        opa: 4,
-        tongue: 6,
-        stand: 9
-      }
+      config: DOG_ANIMATION_CONFIG
     };
   }
 

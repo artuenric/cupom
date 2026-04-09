@@ -128,7 +128,7 @@ function bootApp() {
     return;
   }
 
-  const { animator, config, timelineIndexes } = dogModule.createDogAnimation(dogSprite);
+  const { animator, config } = dogModule.createDogAnimation(dogSprite);
   const state = {
     globalRationBalance: initialGlobalRationBalance,
     pendingFeedCost: 0
@@ -268,8 +268,8 @@ function bootApp() {
     window.addEventListener("keydown", (event) => {
       const key = event.key.toLowerCase();
 
-      if (key === "1") animator.autoIndex = timelineIndexes.tail;
-      if (key === "2") animator.autoIndex = timelineIndexes.stand;
+      if (key === "1") animator.forceNextAutoStep("tail");
+      if (key === "2") animator.forceNextAutoStep("stand");
       if (key === "e") feedController.requestFeed();
       if (key === "c") animator.enqueueManual("chokeSpit");
 
@@ -308,10 +308,10 @@ function bootApp() {
     getFeedBalance: () => state.globalRationBalance,
     getDropBalance: () => dropController.getBalance(),
     getHeartsStatus: () => heartsController.getStatus(),
-    playTailAuto: () => (animator.autoIndex = timelineIndexes.tail),
-    playOpaAuto: () => (animator.autoIndex = timelineIndexes.opa),
-    playTongueAuto: () => (animator.autoIndex = timelineIndexes.tongue),
-    playStandAuto: () => (animator.autoIndex = timelineIndexes.stand)
+    playTailAuto: () => animator.forceNextAutoStep("tail"),
+    playOpaAuto: () => animator.forceNextAutoStep("opa"),
+    playTongueAuto: () => animator.forceNextAutoStep("tongue"),
+    playStandAuto: () => animator.forceNextAutoStep("stand")
   };
 }
 
