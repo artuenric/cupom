@@ -70,6 +70,7 @@
     anchorElement,
     progressBarElement,
     progressFillElement,
+    rewardBurstLayerElement,
     config = {}
   }) {
     if (!anchorElement) {
@@ -100,13 +101,19 @@
           : HEARTS_CONFIG.spawnJitterPattern
     };
     const feedsPerHeart = Math.max(1, Math.round(toFiniteNumber(resolvedConfig.feedsPerHeart, 2)));
+    const rewardMilestones = [60, 80, 100];
+    const rewardBurstIconPath = "./assets/icons/ic-segredo.png";
+    const rewardBurstModule = globalThis.RewardBurstModule;
 
     const state = {
       hearts: [],
       layerElement: null,
       spawnIndex: 0,
       progressPercent: 0,
-      progressMarkers: []
+      progressMarkers: [],
+      reachedMilestones: new Set(),
+      rewardBurstController: null,
+      rewardBurstPendingCount: 0
     };
 
     function mount() {
@@ -150,7 +157,9 @@
           threshold: resolveMarkerThreshold(markerElement)
         }))
         .filter((markerData) => markerData.threshold !== null);
+      setupRewardBurstController();
       syncProgressFromUi();
+      hydrateReachedMilestones();
       renderProgress();
     }
 
@@ -159,10 +168,15 @@
         return;
       }
 
+      state.rewardBurstController?.destroy();
+
       state.layerElement.remove();
       state.layerElement = null;
       state.hearts = [];
       state.progressMarkers = [];
+      state.reachedMilestones.clear();
+      state.rewardBurstController = null;
+      state.rewardBurstPendingCount = 0;
     }
 
     function syncProgressFromUi() {
@@ -176,6 +190,54 @@
       state.progressPercent = clamp(fallbackFromWidth, 0, 100);
     }
 
+    function hydrateReachedMilestones() {
+      state.reachedMilestones.clear();
+      rewardMilestones.forEach((threshold) => {
+        if (state.progressPercent >= threshold) {
+          state.reachedMilestones.add(threshold);
+        }
+      });
+    }
+
+    function setupRewardBurstController() {
+      if (state.rewardBurstController) {
+        return;
+      }
+
+      if (!rewardBurstModule || typeof rewardBurstModule.createRewardBurstController !== "function") {
+        console.error("Modulo de reward burst nao carregado.");
+        return;
+      }
+
+      const overlayHost = rewardBurstLayerElement || anchorElement.parentElement || anchorElement;
+      const burstController = rewardBurstModule.createRewardBurstController({
+        hostElement: overlayHost,
+        iconPath: rewardBurstIconPath
+      });
+
+      burstController.onDismiss(() => {
+        state.rewardBurstPendingCount = Math.max(0, state.rewardBurstPendingCount - 1);
+
+        if (state.rewardBurstPendingCount > 0) {
+          window.setTimeout(() => {
+            showRewardBurst();
+          }, 60);
+        }
+      });
+
+      state.rewardBurstController = burstController;
+    }
+
+    function showRewardBurst() {
+      setupRewardBurstController();
+
+      if (!state.rewardBurstController) {
+        return;
+      }
+
+      state.rewardBurstController.show();
+    }
+
     function renderProgress() {
       if (!progressFillElement || !progressBarElement) {
         return;
@@ -184,20 +246,40 @@
       progressFillElement.style.width = `${state.progressPercent}%`;
       progressBarElement.setAttribute("aria-valuenow", `${Math.round(state.progressPercent)}`);
       state.progressMarkers.forEach((markerData) => {
-        markerData.element.classList.toggle(
-          "is-reached",
-          state.progressPercent >= markerData.threshold
-        );
+        markerData.element.classList.toggle("is-reached", state.progressPercent >= markerData.threshold);
       });
     }
 
     function increaseProgressByHeart() {
+      const previousProgressPercent = state.progressPercent;
+
       state.progressPercent = clamp(
         state.progressPercent + resolvedConfig.progressGainPercent,
         0,
         100
       );
       renderProgress();
+      checkMilestonesCrossed(previousProgressPercent, state.progressPercent);
+    }
+
+    function checkMilestonesCrossed(previousProgressPercent, currentProgressPercent) {
+      rewardMilestones.forEach((threshold) => {
+        const crossedThreshold =
+          previousProgressPercent < threshold && currentProgressPercent >= threshold;
+
+        if (!crossedThreshold || state.reachedMilestones.has(threshold)) {
+          return;
+        }
+
+        state.reachedMilestones.add(threshold);
+        state.rewardBurstPendingCount += 1;
+
+        if (state.rewardBurstController?.isVisible()) {
+          return;
+        }
+
+        showRewardBurst();
+      });
     }
 
     function nextSpawnPosition() {

@@ -106,6 +106,7 @@ function bootApp() {
   const rewardProgress = document.getElementById("rewardProgress");
   const rewardProgressFill = document.getElementById("rewardProgressFill");
   const dogStage = dogSprite?.closest(".dog-stage");
+  const uiLayer = document.querySelector(".ui-layer");
 
   if (
     !dogSprite ||
@@ -115,7 +116,8 @@ function bootApp() {
     !dropBalance ||
     !dropCountdown ||
     !dropGainFeedback ||
-    !dogStage
+    !dogStage ||
+    !uiLayer
   ) {
     console.error("Elementos da interface do cachorro nao foram encontrados.");
     return;
@@ -183,7 +185,8 @@ function bootApp() {
   const heartsController = heartsModule.createHeartSystem({
     anchorElement: dogStage,
     progressBarElement: rewardProgress,
-    progressFillElement: rewardProgressFill
+    progressFillElement: rewardProgressFill,
+    rewardBurstLayerElement: uiLayer
   });
 
   function setupFeedStateSync() {
