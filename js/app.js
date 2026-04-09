@@ -1,3 +1,19 @@
+const APP_DEBUG_PRESET = {
+  enabled: true,
+  rationBalance: 20000,
+  progressPercent: 50
+};
+
+function clampProgressPercent(value) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(numericValue, 0), 100);
+}
+
 function setupSceneReferenceLayout() {
   const gameScreen = document.getElementById("gameScreen");
   const sceneReference = document.getElementById("sceneReference");
@@ -52,10 +68,17 @@ function bootApp() {
   const dogModule = globalThis.DogAnimationModule;
   const feedModule = globalThis.FeedButtonModule;
   const dropModule = globalThis.DropButtonModule;
+  const heartsModule = globalThis.HeartsModule;
   const FEED_COST = 150;
-  const INITIAL_GLOBAL_RATION_BALANCE = 600;
+  const DEFAULT_INITIAL_GLOBAL_RATION_BALANCE = 600;
   const DROP_REWARD_AMOUNT = 150;
   const DROP_REWARD_INTERVAL_MS = 10000;
+  const initialGlobalRationBalance = APP_DEBUG_PRESET.enabled
+    ? APP_DEBUG_PRESET.rationBalance
+    : DEFAULT_INITIAL_GLOBAL_RATION_BALANCE;
+  const initialProgressPercent = APP_DEBUG_PRESET.enabled
+    ? clampProgressPercent(APP_DEBUG_PRESET.progressPercent)
+    : 0;
 
   if (
     !dogModule ||
@@ -63,7 +86,9 @@ function bootApp() {
     !feedModule ||
     typeof feedModule.createFeedButtonController !== "function" ||
     !dropModule ||
-    typeof dropModule.createDropButtonController !== "function"
+    typeof dropModule.createDropButtonController !== "function" ||
+    !heartsModule ||
+    typeof heartsModule.createHeartSystem !== "function"
   ) {
     console.error("Modulos principais da aplicacao nao foram carregados.");
     return;
@@ -78,6 +103,9 @@ function bootApp() {
   const dropBalance = document.getElementById("dropBalance");
   const dropCountdown = document.getElementById("dropCountdown");
   const dropGainFeedback = document.getElementById("dropGainFeedback");
+  const rewardProgress = document.getElementById("rewardProgress");
+  const rewardProgressFill = document.getElementById("rewardProgressFill");
+  const dogStage = dogSprite?.closest(".dog-stage");
 
   if (
     !dogSprite ||
@@ -86,7 +114,8 @@ function bootApp() {
     !dropButton ||
     !dropBalance ||
     !dropCountdown ||
-    !dropGainFeedback
+    !dropGainFeedback ||
+    !dogStage
   ) {
     console.error("Elementos da interface do cachorro nao foram encontrados.");
     return;
@@ -94,9 +123,18 @@ function bootApp() {
 
   const { animator, config, timelineIndexes } = dogModule.createDogAnimation(dogSprite);
   const state = {
-    globalRationBalance: INITIAL_GLOBAL_RATION_BALANCE,
+    globalRationBalance: initialGlobalRationBalance,
     pendingFeedCost: 0
   };
+
+  function applyInitialProgress() {
+    if (!rewardProgress || !rewardProgressFill) {
+      return;
+    }
+
+    rewardProgressFill.style.width = `${initialProgressPercent}%`;
+    rewardProgress.setAttribute("aria-valuenow", `${Math.round(initialProgressPercent)}`);
+  }
 
   function getAvailableFeedBalance() {
     return state.globalRationBalance - state.pendingFeedCost;
@@ -142,6 +180,12 @@ function bootApp() {
     }
   });
 
+  const heartsController = heartsModule.createHeartSystem({
+    anchorElement: dogStage,
+    progressBarElement: rewardProgress,
+    progressFillElement: rewardProgressFill
+  });
+
   function setupFeedStateSync() {
     animator.on("manual-sequence-start", ({ sequenceName }) => {
       if (sequenceName !== "eat" || state.pendingFeedCost < FEED_COST) {
@@ -151,10 +195,12 @@ function bootApp() {
       state.pendingFeedCost -= FEED_COST;
       state.globalRationBalance -= FEED_COST;
       renderGlobalRationBalance();
+      heartsController.registerSuccessfulFeed();
     });
   }
 
   function setupControls() {
+    heartsController.mount();
     feedController.mount();
     dropController.mount();
     dropController.startAccumulator();
@@ -226,6 +272,7 @@ function bootApp() {
   }
 
   animator.start();
+  applyInitialProgress();
   setupFeedStateSync();
   setupControls();
   renderGlobalRationBalance();
@@ -241,6 +288,7 @@ function bootApp() {
     collectDropReward: () => dropController.collectReward(),
     getFeedBalance: () => state.globalRationBalance,
     getDropBalance: () => dropController.getBalance(),
+    getHeartsStatus: () => heartsController.getStatus(),
     playTailAuto: () => (animator.autoIndex = timelineIndexes.tail),
     playOpaAuto: () => (animator.autoIndex = timelineIndexes.opa),
     playTongueAuto: () => (animator.autoIndex = timelineIndexes.tongue),
