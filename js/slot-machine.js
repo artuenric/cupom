@@ -6,7 +6,7 @@
     reelTickMs: 95,
     winChance: 0.24,
     frameImagePath: "./assets/icons/roleta.png",
-    triggerImagePath: "./assets/icons/roleta.png",
+    triggerImagePath: "./assets/icons/bt-roleta.png",
     rewardIconPath: "./assets/icons/ic-racao.png",
     iconPaths: [
       "./assets/icons/ic-anel.png",
