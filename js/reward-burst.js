@@ -1,5 +1,5 @@
 (() => {
-  function createRewardBurstController({ hostElement, iconPath }) {
+  function createRewardBurstController({ hostElement, iconPath, labelText = "" }) {
     if (!hostElement) {
       throw new Error("Elemento host do reward burst nao encontrado.");
     }
@@ -14,12 +14,27 @@
     const coreElement = document.createElement("div");
     coreElement.className = "reward-burst-core";
 
+    const contentElement = document.createElement("div");
+    contentElement.className = "reward-burst-content";
+
     const itemElement = document.createElement("img");
     itemElement.className = "reward-burst-item";
     itemElement.src = iconPath;
     itemElement.alt = "";
 
-    coreElement.appendChild(itemElement);
+    contentElement.appendChild(itemElement);
+
+    let labelElement = null;
+
+    if (typeof labelText === "string" && labelText.trim().length > 0) {
+      coreElement.classList.add("has-label");
+      labelElement = document.createElement("span");
+      labelElement.className = "reward-burst-label";
+      labelElement.textContent = labelText.trim();
+      contentElement.appendChild(labelElement);
+    }
+
+    coreElement.appendChild(contentElement);
     overlayElement.appendChild(coreElement);
     layerElement.appendChild(overlayElement);
     hostElement.appendChild(layerElement);
@@ -29,9 +44,18 @@
     function restartAnimations() {
       coreElement.style.animation = "none";
       itemElement.style.animation = "none";
+
+      if (labelElement) {
+        labelElement.style.animation = "none";
+      }
+
       void overlayElement.offsetWidth;
       coreElement.style.animation = "";
       itemElement.style.animation = "";
+
+      if (labelElement) {
+        labelElement.style.animation = "";
+      }
     }
 
     function onOverlayPointerDown() {

@@ -81,26 +81,6 @@
   opacity: 1;
 }
 
-.slot-machine-close {
-  position: absolute;
-  top: -8px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 999px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  color: #fff8da;
-  background: rgba(38, 24, 8, 0.88);
-  font-size: 20px;
-  font-weight: 900;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.36);
-}
-
 .slot-machine-shell {
   position: relative;
   width: 100%;
@@ -210,94 +190,6 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.48);
 }
 
-.slot-machine-win-burst {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(82vw, 360px);
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.slot-machine-win-burst.is-visible {
-  visibility: visible;
-  animation: slotMachineBurstAppear 1.18s ease-out forwards;
-}
-
-.slot-machine-win-core {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  gap: 8px;
-}
-
-.slot-machine-win-core::before,
-.slot-machine-win-core::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-}
-
-.slot-machine-win-core::before {
-  background:
-    radial-gradient(circle, rgba(255, 245, 208, 0.22) 0 38%, rgba(255, 245, 208, 0) 80%),
-    repeating-conic-gradient(
-      from 0deg,
-      rgba(255, 238, 183, 0.96) 0deg 13deg,
-      rgba(255, 193, 82, 0.95) 13deg 26deg
-    );
-  -webkit-mask-image: radial-gradient(
-    circle,
-    rgba(0, 0, 0, 1) 0 30%,
-    rgba(0, 0, 0, 0.92) 48%,
-    rgba(0, 0, 0, 0.42) 76%,
-    rgba(0, 0, 0, 0) 100%
-  );
-  mask-image: radial-gradient(
-    circle,
-    rgba(0, 0, 0, 1) 0 30%,
-    rgba(0, 0, 0, 0.92) 48%,
-    rgba(0, 0, 0, 0.42) 76%,
-    rgba(0, 0, 0, 0) 100%
-  );
-}
-
-.slot-machine-win-core::after {
-  inset: -6%;
-  background: radial-gradient(circle, rgba(255, 219, 136, 0.5) 40%, rgba(255, 219, 136, 0) 72%);
-  filter: blur(6px);
-}
-
-.slot-machine-win-icon {
-  position: relative;
-  z-index: 2;
-  width: clamp(84px, 24vmin, 130px);
-  height: clamp(84px, 24vmin, 130px);
-  object-fit: contain;
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.38));
-}
-
-.slot-machine-win-label {
-  position: relative;
-  z-index: 2;
-  font-size: clamp(24px, 7.4vmin, 44px);
-  font-weight: 900;
-  line-height: 1;
-  color: #ffe68a;
-  text-shadow:
-    -2px 0 #4b2d08,
-    2px 0 #4b2d08,
-    0 -2px #4b2d08,
-    0 2px #4b2d08;
-}
-
 @media (hover: hover) and (pointer: fine) {
   .slot-machine-trigger:hover,
   .slot-machine-shell:hover {
@@ -315,7 +207,6 @@
   .slot-machine-panel,
   .slot-machine-shell,
   .slot-reel-track,
-  .slot-machine-win-burst,
   .slot-reel-icon:nth-child(2) {
     animation: none !important;
     transition: none !important;
@@ -376,23 +267,5 @@
   }
   100% {
     filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
-  }
-}
-
-@keyframes slotMachineBurstAppear {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.72);
-  }
-  20% {
-    opacity: 1;
-  }
-  72% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.05);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(1.12);
   }
 }

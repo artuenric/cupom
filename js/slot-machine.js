@@ -93,13 +93,6 @@
     const panelElement = document.createElement("div");
     panelElement.className = "slot-machine-panel";
 
-    const closeButton = document.createElement("button");
-    closeButton.type = "button";
-    closeButton.className = "slot-machine-close";
-    closeButton.setAttribute("aria-label", "Fechar");
-    closeButton.textContent = "x";
-    panelElement.appendChild(closeButton);
-
     const shellButton = document.createElement("button");
     shellButton.type = "button";
     shellButton.className = "slot-machine-shell";
@@ -159,29 +152,7 @@
     hintElement.textContent = "Toque na maquina para girar";
     panelElement.appendChild(hintElement);
 
-    const burstElement = document.createElement("div");
-    burstElement.className = "slot-machine-win-burst";
-    burstElement.setAttribute("aria-hidden", "true");
-
-    const burstCore = document.createElement("div");
-    burstCore.className = "slot-machine-win-core";
-
-    const burstIcon = document.createElement("img");
-    burstIcon.className = "slot-machine-win-icon";
-    burstIcon.src = config.rewardIconPath;
-    burstIcon.alt = "";
-    burstIcon.setAttribute("aria-hidden", "true");
-
-    const burstLabel = document.createElement("span");
-    burstLabel.className = "slot-machine-win-label";
-    burstLabel.textContent = `+${config.rewardAmount}`;
-
-    burstCore.appendChild(burstIcon);
-    burstCore.appendChild(burstLabel);
-    burstElement.appendChild(burstCore);
-
     overlayElement.appendChild(panelElement);
-    overlayElement.appendChild(burstElement);
     rootElement.appendChild(overlayElement);
 
     return {
@@ -189,10 +160,8 @@
       triggerButton,
       overlayElement,
       backdropButton,
-      closeButton,
       shellButton,
       hintElement,
-      burstElement,
       reels
     };
   }
@@ -203,13 +172,14 @@
     }
 
     const resolvedConfig = resolveConfig(config);
+    const rewardBurstModule = globalThis.RewardBurstModule;
     const dom = createSlotMachineDom(resolvedConfig);
     const state = {
       isMounted: false,
       isOpen: false,
       isSpinning: false,
       spinFinishTimeoutId: null,
-      burstTimeoutId: null
+      rewardBurstController: null
     };
 
     function pickRandomSymbol() {
@@ -242,28 +212,30 @@
       });
     }
 
-    function clearBurstTimeout() {
-      if (!state.burstTimeoutId) {
+    function setupRewardBurstController() {
+      if (state.rewardBurstController) {
         return;
       }
 
-      clearTimeout(state.burstTimeoutId);
-      state.burstTimeoutId = null;
+      if (!rewardBurstModule || typeof rewardBurstModule.createRewardBurstController !== "function") {
+        console.error("Modulo de reward burst nao carregado para a slot machine.");
+        return;
+      }
+
+      state.rewardBurstController = rewardBurstModule.createRewardBurstController({
+        hostElement: dom.overlayElement,
+        iconPath: resolvedConfig.rewardIconPath,
+        labelText: `+${resolvedConfig.rewardAmount}`
+      });
     }
 
     function hideWinBurst() {
-      clearBurstTimeout();
-      dom.burstElement.classList.remove("is-visible");
+      state.rewardBurstController?.hide();
     }
 
     function showWinBurst() {
-      hideWinBurst();
-      dom.burstElement.classList.remove("is-visible");
-      void dom.burstElement.offsetWidth;
-      dom.burstElement.classList.add("is-visible");
-      state.burstTimeoutId = window.setTimeout(() => {
-        dom.burstElement.classList.remove("is-visible");
-      }, 1180);
+      setupRewardBurstController();
+      state.rewardBurstController?.show();
     }
 
     function clearSpinTimers() {
@@ -435,10 +407,6 @@
       close();
     }
 
-    function handleCloseClick() {
-      close();
-    }
-
     function handleShellClick(event) {
       event.preventDefault();
       startSpin();
@@ -452,7 +420,6 @@
       hostElement.appendChild(dom.rootElement);
       dom.triggerButton.addEventListener("click", handleTriggerClick);
       dom.backdropButton.addEventListener("click", handleBackdropClick);
-      dom.closeButton.addEventListener("click", handleCloseClick);
       dom.shellButton.addEventListener("click", handleShellClick);
       primeReels();
       state.isMounted = true;
@@ -465,11 +432,12 @@
 
       clearSpinTimers();
       hideWinBurst();
+      state.rewardBurstController?.destroy();
+      state.rewardBurstController = null;
       state.isOpen = false;
       state.isSpinning = false;
       dom.triggerButton.removeEventListener("click", handleTriggerClick);
       dom.backdropButton.removeEventListener("click", handleBackdropClick);
-      dom.closeButton.removeEventListener("click", handleCloseClick);
       dom.shellButton.removeEventListener("click", handleShellClick);
       dom.rootElement.remove();
       state.isMounted = false;
