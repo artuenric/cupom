@@ -79,6 +79,9 @@ body {
   filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.28));
   user-select: none;
   -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
 }
 
 /*
@@ -101,18 +104,49 @@ body {
   animation: idleBounce 1.2s ease-in-out infinite;
 }
 
-/* Botão de alimentar (integração inicial com animação manual) */
-.feed-button {
+/* Controle de alimentar: contador + botão */
+.feed-control {
   position: absolute;
   right: 16px;
   bottom: 16px;
+  width: clamp(92px, 23.8vw, 121px);
+  height: clamp(92px, 23.8vw, 121px);
+  z-index: 5;
+}
+
+.feed-balance {
+  position: absolute;
+  right: 2px;
+  bottom: 7px;
+  min-height: 28px;
+  padding: 2px 8px;
+  display: grid;
+  place-items: center;
+  font-size: clamp(20.7px, 4.5vw, 27px);
+  font-weight: 900;
+  line-height: 1;
+  color: #ffd84d;
+  z-index: 2;
+  text-shadow:
+    -2px 0 #ffffff,
+    2px 0 #ffffff,
+    0 -2px #ffffff,
+    0 2px #ffffff,
+    -1px -1px #ffffff,
+    1px -1px #ffffff,
+    -1px 1px #ffffff,
+    1px 1px #ffffff;
+  pointer-events: none;
+}
+
+.feed-button {
+  position: relative;
   width: clamp(92px, 23.8vw, 121px);
   height: clamp(92px, 23.8vw, 121px);
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
-  z-index: 5;
   transition: transform 120ms ease;
 }
 
@@ -122,6 +156,12 @@ body {
 
 .feed-button:active {
   transform: scale(0.96);
+}
+
+.feed-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+  transform: none;
 }
 
 .feed-button-icon {
