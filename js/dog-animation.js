@@ -313,11 +313,15 @@
       }
     }
 
-    stop() {
+    stop(options = {}) {
+      const { resetState = true } = options;
       this.running = false;
       this.interruptCurrentStep();
       this.activeSequenceName = null;
-      this.setState("default");
+
+      if (resetState) {
+        this.setState("default");
+      }
     }
 
     forceNextAutoStep(stepName) {

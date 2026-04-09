@@ -1,7 +1,7 @@
 const APP_DEBUG_PRESET = {
   enabled: true,
   rationBalance: 20000,
-  progressPercent: 50
+  progressPercent: 100
 };
 
 function clampProgressPercent(value) {
@@ -70,10 +70,15 @@ function bootApp() {
   const dropModule = globalThis.DropButtonModule;
   const heartsModule = globalThis.HeartsModule;
   const slotMachineModule = globalThis.SlotMachineModule;
+  const rewardBurstModule = globalThis.RewardBurstModule;
   const FEED_COST = 150;
   const DEFAULT_INITIAL_GLOBAL_RATION_BALANCE = 600;
   const DROP_REWARD_AMOUNT = 150;
   const DROP_REWARD_INTERVAL_MS = 10000;
+  const POST_COMPLETE_HEARTS_TO_CHOKE = 2;
+  const DOG_SPIT_RECOVERY_MS = 860;
+  const DOG_ALLIANCE_FLIGHT_MS = 760;
+  const DOG_ALLIANCE_ICON_PATH = "./assets/icons/ic-alianaca.png";
   const initialGlobalRationBalance = APP_DEBUG_PRESET.enabled
     ? APP_DEBUG_PRESET.rationBalance
     : DEFAULT_INITIAL_GLOBAL_RATION_BALANCE;
@@ -131,7 +136,12 @@ function bootApp() {
   const { animator, config } = dogModule.createDogAnimation(dogSprite);
   const state = {
     globalRationBalance: initialGlobalRationBalance,
-    pendingFeedCost: 0
+    pendingFeedCost: 0,
+    postCompleteHeartCount: 0,
+    dogIsChoking: false,
+    dogRecoveryTimeoutId: null,
+    dogAllianceFlightElement: null,
+    dogAllianceBurstController: null
   };
 
   function applyInitialProgress() {
@@ -151,13 +161,17 @@ function bootApp() {
     return getAvailableFeedBalance() >= FEED_COST;
   }
 
+  function canRequestFeed() {
+    return !state.dogIsChoking && canAffordFeed();
+  }
+
   function renderGlobalRationBalance() {
     globalThis.rationBalance = state.globalRationBalance;
     feedController.render();
   }
 
   function queueFeed() {
-    if (!canAffordFeed()) {
+    if (!canRequestFeed()) {
       return false;
     }
 
@@ -170,7 +184,7 @@ function bootApp() {
     feedButton,
     feedBalanceOutput: globalRationBalance,
     getTotalBalance: () => state.globalRationBalance,
-    canAffordFeed: () => canAffordFeed(),
+    canAffordFeed: () => canRequestFeed(),
     onRequestFeed: queueFeed
   });
 
@@ -187,11 +201,166 @@ function bootApp() {
     }
   });
 
+  function setupDogAllianceBurstController() {
+    if (state.dogAllianceBurstController) {
+      return;
+    }
+
+    if (!rewardBurstModule || typeof rewardBurstModule.createRewardBurstController !== "function") {
+      console.error("Modulo de reward burst nao carregado para o evento da alianca.");
+      return;
+    }
+
+    const overlayHost = uiLayer || gameScreen;
+    state.dogAllianceBurstController = rewardBurstModule.createRewardBurstController({
+      hostElement: overlayHost,
+      iconPath: DOG_ALLIANCE_ICON_PATH
+    });
+  }
+
+  function showDogAllianceBurst() {
+    setupDogAllianceBurstController();
+    state.dogAllianceBurstController?.show();
+  }
+
+  function clearDogAllianceFlight() {
+    if (!state.dogAllianceFlightElement) {
+      return;
+    }
+
+    state.dogAllianceFlightElement.remove();
+    state.dogAllianceFlightElement = null;
+  }
+
+  function launchAllianceToScreenCenter() {
+    if (!dogSprite) {
+      showDogAllianceBurst();
+      return;
+    }
+
+    const overlayHost = uiLayer || gameScreen;
+    const hostRect = overlayHost.getBoundingClientRect();
+    const dogRect = dogSprite.getBoundingClientRect();
+
+    if (hostRect.width <= 0 || hostRect.height <= 0 || dogRect.width <= 0 || dogRect.height <= 0) {
+      showDogAllianceBurst();
+      return;
+    }
+
+    const startX = dogRect.left + dogRect.width / 2 - hostRect.left;
+    const startY = dogRect.top + dogRect.height / 2 - hostRect.top;
+    const targetX = hostRect.width / 2;
+    const targetY = hostRect.height / 2;
+    const deltaX = targetX - startX;
+    const deltaY = targetY - startY;
+
+    clearDogAllianceFlight();
+
+    const flightElement = document.createElement("div");
+    flightElement.className = "dog-alliance-flight";
+    flightElement.style.setProperty("--alliance-start-x", `${startX}px`);
+    flightElement.style.setProperty("--alliance-start-y", `${startY}px`);
+    flightElement.style.setProperty("--alliance-dx", `${deltaX}px`);
+    flightElement.style.setProperty("--alliance-dy", `${deltaY}px`);
+    flightElement.style.setProperty("--alliance-flight-duration", `${DOG_ALLIANCE_FLIGHT_MS}ms`);
+
+    const flightIconElement = document.createElement("img");
+    flightIconElement.className = "dog-alliance-flight-icon";
+    flightIconElement.src = DOG_ALLIANCE_ICON_PATH;
+    flightIconElement.alt = "";
+    flightIconElement.setAttribute("aria-hidden", "true");
+
+    flightElement.appendChild(flightIconElement);
+    overlayHost.appendChild(flightElement);
+    state.dogAllianceFlightElement = flightElement;
+
+    const finalizeFlight = () => {
+      if (state.dogAllianceFlightElement === flightElement) {
+        state.dogAllianceFlightElement = null;
+      }
+
+      flightElement.remove();
+      showDogAllianceBurst();
+    };
+
+    flightElement.addEventListener("animationend", finalizeFlight, { once: true });
+  }
+
+  function enterDogChokeMode() {
+    if (state.dogIsChoking) {
+      return;
+    }
+
+    if (state.dogRecoveryTimeoutId) {
+      clearTimeout(state.dogRecoveryTimeoutId);
+      state.dogRecoveryTimeoutId = null;
+    }
+
+    state.dogIsChoking = true;
+    state.postCompleteHeartCount = 0;
+    clearDogAllianceFlight();
+
+    animator.stop({ resetState: false });
+    animator.setState("choke");
+    dogSprite.classList.remove("is-spitting");
+    void dogSprite.offsetWidth;
+    dogSprite.classList.add("is-choking");
+    feedController.render();
+  }
+
+  function resolveDogChokeMode() {
+    if (!state.dogIsChoking) {
+      return;
+    }
+
+    state.dogIsChoking = false;
+    state.postCompleteHeartCount = 0;
+
+    if (state.dogRecoveryTimeoutId) {
+      clearTimeout(state.dogRecoveryTimeoutId);
+      state.dogRecoveryTimeoutId = null;
+    }
+
+    dogSprite.classList.remove("is-choking");
+    dogSprite.classList.add("is-spitting");
+    animator.setState("spit");
+    launchAllianceToScreenCenter();
+    feedController.render();
+
+    state.dogRecoveryTimeoutId = window.setTimeout(() => {
+      state.dogRecoveryTimeoutId = null;
+      dogSprite.classList.remove("is-spitting");
+
+      if (!animator.running) {
+        animator.start();
+      }
+    }, DOG_SPIT_RECOVERY_MS);
+  }
+
+  function handleHeartConsumedAfterCompletion({ didConsumeWithProgressFull }) {
+    if (state.dogIsChoking) {
+      return;
+    }
+
+    if (didConsumeWithProgressFull) {
+      state.postCompleteHeartCount += 1;
+
+      if (state.postCompleteHeartCount >= POST_COMPLETE_HEARTS_TO_CHOKE) {
+        enterDogChokeMode();
+      }
+
+      return;
+    }
+
+    state.postCompleteHeartCount = 0;
+  }
+
   const heartsController = heartsModule.createHeartSystem({
     anchorElement: dogStage,
     progressBarElement: rewardProgress,
     progressFillElement: rewardProgressFill,
-    rewardBurstLayerElement: uiLayer
+    rewardBurstLayerElement: uiLayer,
+    onHeartConsumed: handleHeartConsumedAfterCompletion
   });
 
   const slotMachineController = slotMachineModule.createSlotMachineController({
@@ -225,6 +394,11 @@ function bootApp() {
 
   function setupDogClick() {
     dogSprite.addEventListener("click", () => {
+      if (state.dogIsChoking) {
+        resolveDogChokeMode();
+        return;
+      }
+
       animator.enqueueManual("stand", { priority: true });
     });
   }

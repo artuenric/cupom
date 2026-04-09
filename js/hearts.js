@@ -71,6 +71,7 @@
     progressBarElement,
     progressFillElement,
     rewardBurstLayerElement,
+    onHeartConsumed,
     config = {}
   }) {
     if (!anchorElement) {
@@ -343,10 +344,26 @@
         return false;
       }
 
+      const progressPercentBeforeConsume = state.progressPercent;
+
       heartState.element.disabled = true;
       heartState.element.classList.remove("is-ready");
       heartState.element.classList.add("is-consuming");
       increaseProgressByHeart();
+      const progressPercentAfterConsume = state.progressPercent;
+
+      if (typeof onHeartConsumed === "function") {
+        try {
+          onHeartConsumed({
+            heartId: heartState.id,
+            progressPercentBeforeConsume,
+            progressPercentAfterConsume,
+            didConsumeWithProgressFull: progressPercentBeforeConsume >= 100
+          });
+        } catch (error) {
+          console.error("Falha ao processar callback de consumo de coracao.", error);
+        }
+      }
 
       window.setTimeout(() => {
         heartState.element.remove();

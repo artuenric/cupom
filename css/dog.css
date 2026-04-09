@@ -21,6 +21,38 @@
   animation: idleBounce 1.2s ease-in-out infinite;
 }
 
+.dog-sprite.is-choking {
+  animation: dogChokeShake 82ms linear infinite;
+}
+
+.dog-sprite.is-spitting {
+  animation: dogSpitBack 320ms ease-out both;
+}
+
+.dog-alliance-flight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  --alliance-start-x: 50%;
+  --alliance-start-y: 50%;
+  --alliance-dx: 0px;
+  --alliance-dy: 0px;
+  --alliance-flight-duration: 760ms;
+}
+
+.dog-alliance-flight-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: clamp(34px, 8.2vmin, 56px);
+  height: clamp(34px, 8.2vmin, 56px);
+  object-fit: contain;
+  transform-origin: center center;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.34));
+  animation: dogAllianceToCenter var(--alliance-flight-duration) cubic-bezier(0.2, 0.78, 0.24, 1) forwards;
+}
+
 @keyframes idleBounce {
   0% {
     transform: translateY(0px) scale(1);
@@ -30,5 +62,72 @@
   }
   100% {
     transform: translateY(0px) scale(1);
+  }
+}
+
+@keyframes dogChokeShake {
+  0% {
+    transform: translate(0px, 0px) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translate(-1px, -1px) rotate(-1.4deg) scale(1.01);
+  }
+  50% {
+    transform: translate(1px, 1px) rotate(1.6deg) scale(1.01);
+  }
+  75% {
+    transform: translate(-1px, 1px) rotate(-1.2deg) scale(1.01);
+  }
+  100% {
+    transform: translate(1px, -1px) rotate(1.4deg) scale(1);
+  }
+}
+
+@keyframes dogSpitBack {
+  0% {
+    transform: translateY(0px) scale(1);
+  }
+  35% {
+    transform: translateY(2px) scale(0.92);
+  }
+  100% {
+    transform: translateY(0px) scale(0.95);
+  }
+}
+
+@keyframes dogAllianceToCenter {
+  0% {
+    transform: translate(
+        calc(var(--alliance-start-x) - 50%),
+        calc(var(--alliance-start-y) - 50%)
+      )
+      translate(0px, 0px) rotate(0deg) scale(0.34);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(
+        calc(var(--alliance-start-x) - 50%),
+        calc(var(--alliance-start-y) - 50%)
+      )
+      translate(0px, -2px) rotate(34deg) scale(0.78);
+    opacity: 1;
+  }
+  76% {
+    transform: translate(
+        calc(var(--alliance-start-x) - 50%),
+        calc(var(--alliance-start-y) - 50%)
+      )
+      translate(calc(var(--alliance-dx) * 0.82), calc(var(--alliance-dy) * 0.82))
+      rotate(280deg) scale(1.22);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+        calc(var(--alliance-start-x) - 50%),
+        calc(var(--alliance-start-y) - 50%)
+      )
+      translate(var(--alliance-dx), var(--alliance-dy))
+      rotate(360deg) scale(1.52);
+    opacity: 1;
   }
 }
