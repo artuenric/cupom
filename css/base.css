@@ -1,0 +1,37 @@
+﻿:root {
+  --page-bg: #f2f5f8;
+  --screen-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  --screen-width: min(96vw, 430px);
+  --screen-ratio: 9 / 16;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: radial-gradient(circle at top, #ffffff 0%, var(--page-bg) 55%, #e8edf2 100%);
+}
+
+body {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.app-wrapper {
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+@media (max-height: 720px) {
+  body {
+    padding: 14px;
+  }
+}
