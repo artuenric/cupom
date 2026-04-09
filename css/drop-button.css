@@ -23,8 +23,9 @@
 
 .drop-balance {
   position: absolute;
-  top: -4px;
   left: 50%;
+  bottom: calc(100% - 25px);
+  transform: translateX(-50%);
   min-width: 82px;
   min-height: 28px;
   padding: 2px 8px;
@@ -40,8 +41,9 @@
 
 .drop-gain-feedback {
   position: absolute;
-  top: -26px;
   left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
   min-width: 72px;
   padding: 2px 8px;
   display: grid;
@@ -95,8 +97,9 @@
 
 .drop-countdown {
   position: absolute;
-  left: 50%;
-  bottom: 21%;
+  left: 45%;
+  top: calc(100% - 33px);
+  transform: translateX(-50%);
   min-width: 40px;
   text-align: center;
   font-size: clamp(18px, 4vw, 22px);
@@ -140,14 +143,14 @@
 @keyframes rewardGainRise {
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.92);
+    transform: translateX(-50%) translateY(8px) scale(0.92);
   }
   20% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translateY(-18px) scale(1.05);
+    transform: translateX(-50%) translateY(-18px) scale(1.05);
   }
 }
 

@@ -25,7 +25,7 @@
     eatFrameDelay: 1000,
     idleHoldFrames: 3,
     sequenceGapFrames: 1,
-    debugMode: true
+    debugMode: false
   };
 
   const DOG_AUTO_TIMELINE = [
