@@ -69,22 +69,15 @@
   border: 0;
   background: transparent;
   cursor: pointer;
-  transition: transform 120ms ease;
-  transform-origin: center bottom;
 }
 
-.drop-button.is-charged {
+.drop-balance.is-charged {
   animation: rewardPulse 1.8s ease-in-out infinite;
-}
-
-.drop-button:active {
-  transform: scale(0.96);
 }
 
 .drop-button:disabled {
   cursor: default;
   opacity: 0.7;
-  transform: none;
 }
 
 .drop-button-icon {
@@ -119,23 +112,17 @@
   pointer-events: none;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .drop-button:hover {
-    transform: scale(1.03);
-  }
-}
-
 @keyframes rewardPulse {
   0% {
-    transform: scale(1);
+    transform: translateX(-50%) scale(1);
     opacity: 0.88;
   }
   50% {
-    transform: scale(1.05);
+    transform: translateX(-50%) scale(1.05);
     opacity: 1;
   }
   100% {
-    transform: scale(1);
+    transform: translateX(-50%) scale(1);
     opacity: 0.88;
   }
 }
@@ -153,4 +140,3 @@
     transform: translateX(-50%) translateY(-18px) scale(1.05);
   }
 }
-

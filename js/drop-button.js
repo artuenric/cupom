@@ -47,7 +47,7 @@
 
     function renderDropBalance() {
       dropBalanceOutput.textContent = `+${dropBalance}`;
-      dropButton.classList.toggle("is-charged", dropBalance > 0);
+      dropBalanceOutput.classList.toggle("is-charged", dropBalance > 0);
     }
 
     function renderCountdown(seconds) {
