@@ -1,4 +1,6 @@
 (() => {
+  const INTERACTION_LOCK_MS = 2000;
+
   function createRewardBurstController({ hostElement, iconPath, labelText = "" }) {
     if (!hostElement) {
       throw new Error("Elemento host do reward burst nao encontrado.");
@@ -40,6 +42,8 @@
     hostElement.appendChild(layerElement);
 
     let dismissCallback = null;
+    let interactionUnlockAt = 0;
+    let unlockTimeoutId = null;
 
     function restartAnimations() {
       coreElement.style.animation = "none";
@@ -58,8 +62,15 @@
       }
     }
 
-    function onOverlayPointerDown() {
+    function onOverlayPointerDown(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
       if (!isVisible()) {
+        return;
+      }
+
+      if (Date.now() < interactionUnlockAt) {
         return;
       }
 
@@ -71,6 +82,17 @@
     }
 
     function show() {
+      interactionUnlockAt = Date.now() + INTERACTION_LOCK_MS;
+
+      if (unlockTimeoutId) {
+        clearTimeout(unlockTimeoutId);
+        unlockTimeoutId = null;
+      }
+
+      unlockTimeoutId = window.setTimeout(() => {
+        unlockTimeoutId = null;
+      }, INTERACTION_LOCK_MS);
+
       restartAnimations();
       overlayElement.classList.remove("is-visible");
       void overlayElement.offsetWidth;
@@ -90,9 +112,15 @@
     }
 
     function destroy() {
+      if (unlockTimeoutId) {
+        clearTimeout(unlockTimeoutId);
+        unlockTimeoutId = null;
+      }
+
       overlayElement.removeEventListener("pointerdown", onOverlayPointerDown);
       layerElement.remove();
       dismissCallback = null;
+      interactionUnlockAt = 0;
     }
 
     overlayElement.addEventListener("pointerdown", onOverlayPointerDown);
