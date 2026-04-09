@@ -100,6 +100,30 @@
   -webkit-user-drag: none;
 }
 
+.drop-countdown {
+  position: absolute;
+  left: 45%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  min-width: 40px;
+  text-align: center;
+  font-size: clamp(18px, 4vw, 22px);
+  font-weight: 900;
+  line-height: 1;
+  color: #2196ff;
+  text-shadow:
+    -2px 0 #ffffff,
+    2px 0 #ffffff,
+    0 -2px #ffffff,
+    0 2px #ffffff,
+    -1px -1px #ffffff,
+    1px -1px #ffffff,
+    -1px 1px #ffffff,
+    1px 1px #ffffff;
+  z-index: 2;
+  pointer-events: none;
+}
+
 @keyframes rewardPulse {
   0% {
     transform: scale(1);

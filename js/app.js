@@ -24,6 +24,7 @@ function bootApp() {
   const globalRationBalance = document.getElementById("globalRationBalance");
   const dropButton = document.getElementById("dropButton");
   const dropBalance = document.getElementById("dropBalance");
+  const dropCountdown = document.getElementById("dropCountdown");
   const dropGainFeedback = document.getElementById("dropGainFeedback");
 
   if (
@@ -32,6 +33,7 @@ function bootApp() {
     !globalRationBalance ||
     !dropButton ||
     !dropBalance ||
+    !dropCountdown ||
     !dropGainFeedback
   ) {
     console.error("Elementos da interface do cachorro nao foram encontrados.");
@@ -78,6 +80,7 @@ function bootApp() {
   const dropController = dropModule.createDropButtonController({
     dropButton,
     dropBalanceOutput: dropBalance,
+    dropCountdownOutput: dropCountdown,
     dropGainFeedback,
     rewardAmount: DROP_REWARD_AMOUNT,
     rewardIntervalMs: DROP_REWARD_INTERVAL_MS,
