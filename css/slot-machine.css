@@ -17,10 +17,15 @@
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
+  transition: transform 120ms ease;
 }
 
 .slot-machine-trigger.is-active {
   animation: none;
+}
+
+.slot-machine-trigger:active {
+  transform: scale(0.96);
 }
 
 .slot-machine-trigger-icon {
@@ -89,6 +94,7 @@
   background: transparent;
   cursor: pointer;
   filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
+  transition: transform 120ms ease;
 }
 
 .slot-machine-overlay.is-open .slot-machine-shell {
@@ -101,6 +107,10 @@
 
 .slot-machine-shell.is-winning {
   animation: slotMachineWinGlow 780ms ease-in-out 2;
+}
+
+.slot-machine-shell:active {
+  transform: scale(0.96);
 }
 
 .slot-machine-frame {
@@ -184,6 +194,10 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .slot-machine-trigger:hover {
+    transform: scale(1.03);
+  }
+
   .slot-machine-shell:hover {
     transform: scale(1.03);
   }
