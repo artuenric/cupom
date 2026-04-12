@@ -1,7 +1,7 @@
 const APP_DEBUG_PRESET = {
   enabled: true,
   rationBalance: 600,
-  progressPercent: 0
+  progressPercent: 100
 };
 
 function clampProgressPercent(value) {
@@ -76,6 +76,8 @@ function bootApp() {
   const DROP_REWARD_AMOUNT = 750;
   const DROP_REWARD_INTERVAL_MS = 10000;
   const POST_COMPLETE_HEARTS_TO_CHOKE = 2;
+  const DOG_CHOKE_TAPS_TO_RECOVER = 3;
+  const DOG_CHOKE_TAP_FEEDBACK_DELAY_MS = 140;
   const DOG_SPIT_RECOVERY_MS = 860;
   const DOG_ALLIANCE_FLIGHT_MS = 760;
   const DOG_ALLIANCE_ICON_PATH = "./assets/icons/ic-alianaca.png";
@@ -138,7 +140,9 @@ function bootApp() {
     globalRationBalance: initialGlobalRationBalance,
     pendingFeedCost: 0,
     postCompleteHeartCount: 0,
+    dogChokeTapCount: 0,
     dogIsChoking: false,
+    dogChokeResolveTimeoutId: null,
     dogRecoveryTimeoutId: null,
     dogAllianceFlightElement: null,
     dogAllianceBurstController: null
@@ -298,13 +302,22 @@ function bootApp() {
 
     state.dogIsChoking = true;
     state.postCompleteHeartCount = 0;
+    state.dogChokeTapCount = 0;
+
+    if (state.dogChokeResolveTimeoutId) {
+      clearTimeout(state.dogChokeResolveTimeoutId);
+      state.dogChokeResolveTimeoutId = null;
+    }
+
     clearDogAllianceFlight();
 
     animator.stop({ resetState: false });
     animator.setState("choke");
     dogSprite.classList.remove("is-spitting");
+    dogSprite.classList.remove("is-choke-tap");
+    dogSprite.classList.remove("is-choking");
+    dogSprite.classList.remove("is-choking-fast");
     void dogSprite.offsetWidth;
-    dogSprite.classList.add("is-choking");
     feedController.render();
   }
 
@@ -315,6 +328,12 @@ function bootApp() {
 
     state.dogIsChoking = false;
     state.postCompleteHeartCount = 0;
+    state.dogChokeTapCount = 0;
+
+    if (state.dogChokeResolveTimeoutId) {
+      clearTimeout(state.dogChokeResolveTimeoutId);
+      state.dogChokeResolveTimeoutId = null;
+    }
 
     if (state.dogRecoveryTimeoutId) {
       clearTimeout(state.dogRecoveryTimeoutId);
@@ -322,6 +341,8 @@ function bootApp() {
     }
 
     dogSprite.classList.remove("is-choking");
+    dogSprite.classList.remove("is-choking-fast");
+    dogSprite.classList.remove("is-choke-tap");
     dogSprite.classList.add("is-spitting");
     animator.setState("spit");
     launchAllianceToScreenCenter();
@@ -353,6 +374,43 @@ function bootApp() {
     }
 
     state.postCompleteHeartCount = 0;
+  }
+
+  function playDogChokeTapFeedback() {
+    if (!dogSprite || !state.dogIsChoking) {
+      return;
+    }
+
+    const handleTapAnimationEnd = () => {
+      dogSprite.classList.remove("is-choke-tap");
+    };
+
+    dogSprite.removeEventListener("animationend", handleTapAnimationEnd);
+    dogSprite.classList.remove("is-choke-tap");
+    void dogSprite.offsetWidth;
+    dogSprite.classList.add("is-choke-tap");
+    dogSprite.addEventListener("animationend", handleTapAnimationEnd, { once: true });
+  }
+
+  function updateDogChokeShakeByTapCount() {
+    if (!dogSprite || !state.dogIsChoking) {
+      return;
+    }
+
+    if (state.dogChokeTapCount >= 2) {
+      dogSprite.classList.remove("is-choking");
+      dogSprite.classList.add("is-choking-fast");
+      return;
+    }
+
+    if (state.dogChokeTapCount >= 1) {
+      dogSprite.classList.remove("is-choking-fast");
+      dogSprite.classList.add("is-choking");
+      return;
+    }
+
+    dogSprite.classList.remove("is-choking");
+    dogSprite.classList.remove("is-choking-fast");
   }
 
   const heartsController = heartsModule.createHeartSystem({
@@ -395,7 +453,20 @@ function bootApp() {
   function setupDogClick() {
     dogSprite.addEventListener("click", () => {
       if (state.dogIsChoking) {
-        resolveDogChokeMode();
+        playDogChokeTapFeedback();
+        state.dogChokeTapCount += 1;
+        updateDogChokeShakeByTapCount();
+
+        if (
+          state.dogChokeTapCount >= DOG_CHOKE_TAPS_TO_RECOVER &&
+          !state.dogChokeResolveTimeoutId
+        ) {
+          state.dogChokeResolveTimeoutId = window.setTimeout(() => {
+            state.dogChokeResolveTimeoutId = null;
+            resolveDogChokeMode();
+          }, DOG_CHOKE_TAP_FEEDBACK_DELAY_MS);
+        }
+
         return;
       }
 
