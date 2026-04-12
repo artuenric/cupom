@@ -1,7 +1,7 @@
 const APP_DEBUG_PRESET = {
   enabled: true,
   rationBalance: 600,
-  progressPercent: 100
+  progressPercent: 0
 };
 
 function clampProgressPercent(value) {
