@@ -102,13 +102,23 @@
           : HEARTS_CONFIG.spawnJitterPattern
     };
     const feedsPerHeart = Math.max(1, Math.round(toFiniteNumber(resolvedConfig.feedsPerHeart, 2)));
-    const rewardMilestoneIcons = new Map([
-      [60, "./assets/icons/ic-prato.png"],
-      [80, "./assets/icons/ic-chocolate.png"],
-      [100, "./assets/icons/ic-cupom.png"]
-    ]);
-    const rewardMilestones = Array.from(rewardMilestoneIcons.keys());
-    const defaultRewardBurstIconPath = rewardMilestoneIcons.get(100);
+    const orderedRewardMilestones = [
+      { threshold: 60, iconPath: "./assets/icons/ic-prato.png" },
+      { threshold: 80, iconPath: "./assets/icons/ic-chocolate.png" },
+      { threshold: 100, iconPath: "./assets/icons/ic-cupom.png" }
+    ];
+    const rewardMilestoneIcons = new Map(
+      orderedRewardMilestones.map((milestone) => [milestone.threshold, milestone.iconPath])
+    );
+    const rewardMilestones = orderedRewardMilestones.map((milestone) => milestone.threshold);
+    const rewardMilestoneOrder = new Map(
+      rewardMilestones.map((threshold, index) => [threshold, index])
+    );
+    const firstRewardBurstIconPath = orderedRewardMilestones[0]?.iconPath || "";
+    const fallbackRewardBurstIconPath =
+      firstRewardBurstIconPath ||
+      rewardMilestoneIcons.get(100) ||
+      resolvedConfig.iconPath;
     const rewardBurstModule = globalThis.RewardBurstModule;
 
     const state = {
@@ -119,8 +129,24 @@
       progressMarkers: [],
       reachedMilestones: new Set(),
       rewardBurstController: null,
-      rewardBurstPendingMilestones: []
+      rewardBurstPendingMilestones: [],
+      lastShownMilestoneIndex: -1
     };
+
+    function preloadRewardMilestoneIcons() {
+      if (typeof window === "undefined" || typeof window.Image !== "function") {
+        return;
+      }
+
+      orderedRewardMilestones.forEach((milestone) => {
+        if (typeof milestone.iconPath !== "string" || milestone.iconPath.trim().length === 0) {
+          return;
+        }
+
+        const preloadImage = new window.Image();
+        preloadImage.src = milestone.iconPath;
+      });
+    }
 
     function mount() {
       if (state.layerElement) {
@@ -163,6 +189,7 @@
           threshold: resolveMarkerThreshold(markerElement)
         }))
         .filter((markerData) => markerData.threshold !== null);
+      preloadRewardMilestoneIcons();
       setupRewardBurstController();
       syncProgressFromUi();
       hydrateReachedMilestones();
@@ -183,6 +210,7 @@
       state.reachedMilestones.clear();
       state.rewardBurstController = null;
       state.rewardBurstPendingMilestones = [];
+      state.lastShownMilestoneIndex = -1;
     }
 
     function syncProgressFromUi() {
@@ -203,6 +231,51 @@
           state.reachedMilestones.add(threshold);
         }
       });
+      state.lastShownMilestoneIndex = rewardMilestones.reduce((highestShownIndex, threshold, index) => {
+        if (state.progressPercent >= threshold) {
+          return index;
+        }
+
+        return highestShownIndex;
+      }, -1);
+    }
+
+    function enqueuePendingMilestone(threshold) {
+      if (!rewardMilestoneOrder.has(threshold)) {
+        return;
+      }
+
+      if (!state.rewardBurstPendingMilestones.includes(threshold)) {
+        state.rewardBurstPendingMilestones.push(threshold);
+      }
+
+      state.rewardBurstPendingMilestones.sort((leftThreshold, rightThreshold) => {
+        const leftOrder = rewardMilestoneOrder.get(leftThreshold);
+        const rightOrder = rewardMilestoneOrder.get(rightThreshold);
+        return leftOrder - rightOrder;
+      });
+    }
+
+    function dequeuePendingMilestone(threshold) {
+      state.rewardBurstPendingMilestones = state.rewardBurstPendingMilestones.filter(
+        (pendingThreshold) => pendingThreshold !== threshold
+      );
+    }
+
+    function getNextExpectedMilestone() {
+      for (
+        let milestoneIndex = state.lastShownMilestoneIndex + 1;
+        milestoneIndex < rewardMilestones.length;
+        milestoneIndex += 1
+      ) {
+        const threshold = rewardMilestones[milestoneIndex];
+
+        if (state.reachedMilestones.has(threshold)) {
+          return threshold;
+        }
+      }
+
+      return null;
     }
 
     function setupRewardBurstController() {
@@ -218,11 +291,11 @@
       const overlayHost = rewardBurstLayerElement || anchorElement.parentElement || anchorElement;
       const burstController = rewardBurstModule.createRewardBurstController({
         hostElement: overlayHost,
-        iconPath: defaultRewardBurstIconPath
+        iconPath: fallbackRewardBurstIconPath
       });
 
       burstController.onDismiss(() => {
-        if (state.rewardBurstPendingMilestones.length === 0) {
+        if (getNextExpectedMilestone() === null) {
           return;
         }
 
@@ -241,20 +314,30 @@
         return;
       }
 
-      const rewardIconPath =
-        rewardMilestoneIcons.get(threshold) ||
-        defaultRewardBurstIconPath;
-      state.rewardBurstController.setIconPath?.(rewardIconPath);
+      const nextExpectedMilestone = getNextExpectedMilestone();
+      const thresholdToShow = nextExpectedMilestone ?? threshold;
 
-      state.rewardBurstController.show();
-    }
-
-    function showNextRewardBurst() {
-      if (state.rewardBurstPendingMilestones.length === 0) {
+      if (!rewardMilestoneOrder.has(thresholdToShow)) {
         return;
       }
 
-      const nextThreshold = state.rewardBurstPendingMilestones.shift();
+      dequeuePendingMilestone(thresholdToShow);
+      const rewardIconPath =
+        rewardMilestoneIcons.get(thresholdToShow) ||
+        fallbackRewardBurstIconPath;
+      state.rewardBurstController.setIconPath?.(rewardIconPath);
+      state.rewardBurstController.show();
+      state.lastShownMilestoneIndex = rewardMilestoneOrder.get(thresholdToShow);
+    }
+
+    function showNextRewardBurst() {
+      const nextThreshold = getNextExpectedMilestone();
+
+      if (nextThreshold === null) {
+        state.rewardBurstPendingMilestones = [];
+        return;
+      }
+
       showRewardBurst(nextThreshold);
     }
 
@@ -292,7 +375,7 @@
         }
 
         state.reachedMilestones.add(threshold);
-        state.rewardBurstPendingMilestones.push(threshold);
+        enqueuePendingMilestone(threshold);
 
         if (state.rewardBurstController?.isVisible()) {
           return;
