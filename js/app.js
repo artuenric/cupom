@@ -1,6 +1,6 @@
 const APP_DEBUG_PRESET = {
   enabled: true,
-  rationBalance: 0,
+  rationBalance: 600,
   progressPercent: 0
 };
 
