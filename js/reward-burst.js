@@ -45,6 +45,18 @@
     let interactionUnlockAt = 0;
     let unlockTimeoutId = null;
 
+    function syncCoreSizeToHost() {
+      const hostRect = hostElement.getBoundingClientRect();
+
+      if (hostRect.width <= 0 || hostRect.height <= 0) {
+        return;
+      }
+
+      const hostDiagonal = Math.hypot(hostRect.width, hostRect.height);
+      const burstDiameter = Math.max(760, Math.round(hostDiagonal * 1.18));
+      coreElement.style.setProperty("--reward-burst-size", `${burstDiameter}px`);
+    }
+
     function restartAnimations() {
       coreElement.style.animation = "none";
       itemElement.style.animation = "none";
@@ -93,6 +105,7 @@
         unlockTimeoutId = null;
       }, INTERACTION_LOCK_MS);
 
+      syncCoreSizeToHost();
       restartAnimations();
       overlayElement.classList.remove("is-visible");
       void overlayElement.offsetWidth;
@@ -131,6 +144,7 @@
       interactionUnlockAt = 0;
     }
 
+    syncCoreSizeToHost();
     overlayElement.addEventListener("pointerdown", onOverlayPointerDown);
 
     return {
